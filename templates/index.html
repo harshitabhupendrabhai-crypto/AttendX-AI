@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AttendX AI — Smart Attendance & Analytics Tracker</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- QR code generator (pure JS, no external server) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════  SIDEBAR  ═══════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-icon">⬡</span>
+    <div>
+      <div class="brand-name">AttendX AI</div>
+      <div class="brand-sub">Smart Tracker</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="#" class="nav-item active" data-section="dashboard">
+      <span class="nav-icon">▦</span> Dashboard
+    </a>
+    <a href="#" class="nav-item" data-section="mark">
+      <span class="nav-icon">✔</span> Mark Attendance
+    </a>
+    <a href="#" class="nav-item" data-section="records">
+      <span class="nav-icon">☰</span> Live Records
+    </a>
+    <a href="#" class="nav-item" data-section="risk">
+      <span class="nav-icon">⚠</span> Risk Analytics
+    </a>
+    <a href="#" class="nav-item" data-section="export">
+      <span class="nav-icon">↓</span> Export Report
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sdg-badge sdg4">SDG 4</div>
+    <div class="sdg-badge sdg8">SDG 8</div>
+    <div class="author-tag">by {{ author }}</div>
+  </div>
+</aside>
+
+<!-- ═══════════════════════  MAIN CONTENT  ═══════════════════════ -->
+<main class="main-content">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
+    <div class="topbar-title">
+      <span id="sectionTitle">Executive Dashboard</span>
+    </div>
+    <div class="topbar-right">
+      <span class="live-badge">● LIVE</span>
+      <span id="clockDisplay" class="clock"></span>
+    </div>
+  </header>
+
+  <!-- ──────────  SECTION: Dashboard  ────────── -->
+  <section id="section-dashboard" class="section active">
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card" id="kpi-enrolled">
+        <div class="kpi-label">Total Enrolled</div>
+        <div class="kpi-value" id="kpiEnrolled">—</div>
+        <div class="kpi-sub">Students / Employees</div>
+      </div>
+      <div class="kpi-card kpi-accent" id="kpi-rate">
+        <div class="kpi-label">Today's Attendance</div>
+        <div class="kpi-value" id="kpiRate">—</div>
+        <div class="kpi-sub" id="kpiRateSub">of enrolled</div>
+      </div>
+      <div class="kpi-card" id="kpi-punctual">
+        <div class="kpi-label">Punctual Arrivals</div>
+        <div class="kpi-value" id="kpiPunctual">—</div>
+        <div class="kpi-sub" id="kpiLate">Late: —</div>
+      </div>
+      <div class="kpi-card kpi-risk" id="kpi-risk">
+        <div class="kpi-label">⚠ High-Risk Members</div>
+        <div class="kpi-value" id="kpiRisk">—</div>
+        <div class="kpi-sub">&lt;75% attendance</div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="charts-row">
+      <div class="chart-card wide">
+        <div class="chart-header">
+          <span class="chart-title">Weekly Attendance Trend</span>
+        </div>
+        <canvas id="trendChart" height="120"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <span class="chart-title">Today's Breakdown</span>
+        </div>
+        <canvas id="donutChart" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- Risk alert strip -->
+    <div id="riskStrip" class="risk-strip hidden">
+      <span class="risk-strip-icon">⚠</span>
+      <span id="riskStripText"></span>
+    </div>
+
+  </section>
+
+  <!-- ──────────  SECTION: Mark Attendance  ────────── -->
+  <section id="section-mark" class="section">
+
+    <div class="intake-grid">
+
+      <!-- QR Panel -->
+      <div class="intake-card" id="qrPanel">
+        <div class="intake-card-header">
+          <span class="intake-mode-icon qr-icon">⬡</span>
+          <div>
+            <div class="intake-title">Dynamic QR Scanner</div>
+            <div class="intake-sub">Token refreshes every 15 seconds — prevents screenshot reuse</div>
+          </div>
+        </div>
+        <div class="qr-container">
+          <canvas id="qrCanvas"></canvas>
+          <div class="qr-overlay" id="qrOverlay">
+            <div class="qr-expired-msg">QR Expired<br><small>Generating new token…</small></div>
+          </div>
+        </div>
+        <div class="qr-meta">
+          <span>Token: <code id="qrTokenDisplay">—</code></span>
+          <span class="qr-timer-label">Expires in <span id="qrCountdown" class="countdown">15</span>s</span>
+        </div>
+        <div class="timer-bar-wrap"><div id="timerBar" class="timer-bar"></div></div>
+
+        <div class="form-group mt-md">
+          <label>Roll No / Employee ID</label>
+          <input type="text" id="qrRollInput" placeholder="e.g. CS-2021-01" autocomplete="off" />
+        </div>
+        <button class="btn-primary" id="btnMarkQR">Mark via QR</button>
+        <div id="qrFeedback" class="feedback-msg hidden"></div>
+      </div>
+
+      <!-- Face Recognition Panel -->
+      <div class="intake-card" id="facePanel">
+        <div class="intake-card-header">
+          <span class="intake-mode-icon face-icon">◎</span>
+          <div>
+            <div class="intake-title">Face Recognition</div>
+            <div class="intake-sub">Confidence threshold &gt;90% — simulated biometric scan</div>
+          </div>
+        </div>
+
+        <div class="webcam-container" id="webcamContainer">
+          <video id="webcamVideo" autoplay playsinline muted></video>
+          <canvas id="webcamCanvas"></canvas>
+          <div class="webcam-idle" id="webcamIdle">
+            <div class="webcam-idle-icon">◎</div>
+            <div>Camera Inactive</div>
+            <small>Click "Start Camera" to begin</small>
+          </div>
+          <div class="scan-line" id="scanLine"></div>
+          <div class="face-box" id="faceBox"></div>
+        </div>
+
+        <div class="confidence-bar-wrap" id="confidenceWrap">
+          <div class="conf-label">Confidence: <span id="confScore">—</span></div>
+          <div class="confidence-bar-bg">
+            <div id="confidenceBar" class="confidence-bar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div class="webcam-controls">
+          <button class="btn-secondary" id="btnStartCam">▶ Start Camera</button>
+          <button class="btn-secondary" id="btnStopCam" disabled>■ Stop</button>
+        </div>
+
+        <div class="form-group mt-sm">
+          <label>Roll No / Employee ID</label>
+          <input type="text" id="faceRollInput" placeholder="e.g. CS-2021-01" autocomplete="off" />
+        </div>
+        <button class="btn-primary" id="btnMarkFace">Scan & Mark Attendance</button>
+        <div id="faceFeedback" class="feedback-msg hidden"></div>
+      </div>
+
+    </div>
+
+    <!-- Members quick-reference -->
+    <div class="card mt-lg">
+      <div class="card-header">Enrolled Members — Quick Reference</div>
+      <div class="members-grid">
+        {% for m in members %}
+        <div class="member-chip" data-roll="{{ m.roll_no }}">
+          <span class="member-avatar">{{ m.name[0] }}</span>
+          <div>
+            <div class="member-name">{{ m.name }}</div>
+            <div class="member-roll">{{ m.roll_no }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ──────────  SECTION: Live Records  ────────── -->
+  <section id="section-records" class="section">
+    <div class="card">
+      <div class="card-header">
+        <span>Live Attendance Feed</span>
+        <div class="record-controls">
+          <input type="date" id="dateFilter" class="date-input" />
+          <button class="btn-secondary sm" id="btnRefreshRecords">↺ Refresh</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="recordsTable">
+          <thead>
+            <tr>
+              <th>#</th><th>Name</th><th>Roll No</th><th>Date</th>
+              <th>Time</th><th>Mode</th><th>Status</th><th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody id="recordsBody">
+            <tr><td colspan="8" class="table-empty">Loading records…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ──────────  SECTION: Risk Analytics  ────────── -->
+  <section id="section-risk" class="section">
+    <div class="card mb-md">
+      <div class="card-header">Predictive Absenteeism & Dropout Risk Engine</div>
+      <p class="card-desc">AI rule-engine analyzes 30-day attendance patterns to identify members at risk of falling below the <strong>75% mandatory attendance threshold</strong>.</p>
+    </div>
+
+    <div class="charts-row mb-md">
+      <div class="chart-card wide">
+        <div class="chart-header"><span class="chart-title">Attendance Rate by Member</span></div>
+        <canvas id="riskBarChart" height="130"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span>Risk Register</span>
+        <span id="riskCount" class="badge-pill"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="riskTable">
+          <thead>
+            <tr>
+              <th>Name</th><th>Roll No</th><th>Dept.</th>
+              <th>Rate (30d)</th><th>Consec. Absent</th><th>Last Seen</th><th>Risk Level</th>
+            </tr>
+          </thead>
+          <tbody id="riskBody">
+            <tr><td colspan="7" class="table-empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ──────────  SECTION: Export  ────────── -->
+  <section id="section-export" class="section">
+    <div class="card export-card">
+      <div class="export-icon">↓</div>
+      <h2 class="export-title">Automated Report Exporter</h2>
+      <p class="export-desc">
+        One-click export generates a complete attendance report in <strong>CSV format</strong>,
+        including all records with mode, status, and confidence scores —
+        ready for institutional submission or compliance archiving.
+      </p>
+      <div class="export-meta">
+        <div class="export-meta-item">
+          <div class="export-meta-label">Format</div>
+          <div class="export-meta-value">CSV (UTF-8)</div>
+        </div>
+        <div class="export-meta-item">
+          <div class="export-meta-label">Columns</div>
+          <div class="export-meta-value">9 fields</div>
+        </div>
+        <div class="export-meta-item">
+          <div class="export-meta-label">SDG Alignment</div>
+          <div class="export-meta-value">Goal 4 · Goal 8</div>
+        </div>
+      </div>
+      <a href="/api/export-report" class="btn-primary export-btn" download>
+        ↓ Download CSV Report
+      </a>
+      <p class="export-note">Report includes all historical + today's records.</p>
+    </div>
+  </section>
+
+</main>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
